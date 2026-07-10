@@ -1,0 +1,15 @@
+{
+    "Student": [
+        "firstName", 
+        "lastName", 
+        "middleInitial", 
+        "dateOfBirth", 
+        "gender", 
+        "address", 
+        "lrn", 
+        "gradeLevel", 
+        "section", 
+        "guardianName", 
+        "guardianContactNumber"
+    ]
+}
