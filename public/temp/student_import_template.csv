@@ -1,0 +1,5 @@
+﻿firstName,lastName,middleInitial,dateOfBirth,gender,address,lrn,gradeLevel,section,guardianName,guardianContactNumber
+Chow-Yan,Burton,E,10/10/2021,Male,"Layog, Barcelona, Sorsogon",1.23135E+11,10,A,Diwata Burton,9362514789
+Marc Denver,Cabaya,L,8/8/2021,Male,"Macabari, Barcelona, Sorsogon",1.21115E+11,9,A,Lans Cabaya,9252536144
+Trisha Mae,Endaya,E,9/9/2021,Female,"Buhang, Bulusan, Sorsogon",1.23135E+11,8,B,Lovely Endaya,9254125478
+Pauline,Espaldon,A,5/5/2021,Female,"Macabari, Barcelona, Sorsogon",1.2311E+12,9,A,Corazon Espaldon,2635554126

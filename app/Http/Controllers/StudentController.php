@@ -128,6 +128,10 @@ class StudentController extends Controller
             return back()->withErrors(['csv_file' => 'The CSV file is empty.']);
         }
 
+        $headers = array_map(function ($h) {
+            return trim(str_replace("\xEF\xBB\xBF", '', $h));
+        }, $headers);
+
         $expectedHeaders = [
             'firstName',
             'lastName',

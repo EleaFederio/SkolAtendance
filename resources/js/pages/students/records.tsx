@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { FileUp, Pencil, Plus, QrCode, Trash2, Upload } from 'lucide-react';
+import { FileUp, Eye, Pencil, Plus, QrCode, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ export default function StudentRecords({ students, imported, import_errors }: Pr
     const user = page.props.auth?.user;
     const isSuperUser = user?.role === 'super-user';
     const [addOpen, setAddOpen] = useState(false);
+    const [viewStudent, setViewStudent] = useState<Student | null>(null);
     const [editStudent, setEditStudent] = useState<Student | null>(null);
     const [deleteStudent, setDeleteStudent] = useState<Student | null>(null);
     const [qrStudent, setQrStudent] = useState<Student | null>(null);
@@ -178,6 +179,7 @@ export default function StudentRecords({ students, imported, import_errors }: Pr
         e.preventDefault();
         if (!importForm.data.csv_file) return;
         importForm.post(`/${teamSlug}/students/import`, {
+            forceFormData: true,
             onSuccess: () => {
                 setImportOpen(false);
                 importForm.reset();
@@ -276,6 +278,20 @@ export default function StudentRecords({ students, imported, import_errors }: Pr
                                             <td className="p-3 text-right">
                                                 {isSuperUser && (
                                                     <div className="flex justify-end gap-2">
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => setViewStudent(student)}
+                                                                    >
+                                                                        <Eye className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>View Student</TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
                                                         <TooltipProvider>
                                                             <Tooltip>
                                                                 <TooltipTrigger asChild>
@@ -577,6 +593,79 @@ export default function StudentRecords({ students, imported, import_errors }: Pr
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDeleteStudent(null)}>Cancel</Button>
                         <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!viewStudent} onOpenChange={() => setViewStudent(null)}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Student Details</DialogTitle>
+                    </DialogHeader>
+                    {viewStudent && (
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-4">
+                                {viewStudent.picture ? (
+                                    <img
+                                        src={`/storage/${viewStudent.picture}`}
+                                        alt={`${viewStudent.first_name} ${viewStudent.last_name}`}
+                                        className="h-24 w-24 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-muted text-2xl font-medium">
+                                        {viewStudent.first_name[0]}{viewStudent.last_name[0]}
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="text-lg font-semibold">
+                                        {viewStudent.last_name}, {viewStudent.first_name}
+                                        {viewStudent.middle_initial ? ` ${viewStudent.middle_initial}.` : ''}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">LRN: {viewStudent.lrn}</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="font-medium text-muted-foreground">Date of Birth</p>
+                                    <p>{new Date(viewStudent.date_of_birth).toLocaleDateString()}</p>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-muted-foreground">Gender</p>
+                                    <p>{viewStudent.gender}</p>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-muted-foreground">Grade Level</p>
+                                    <p>{viewStudent.grade_level}</p>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-muted-foreground">Section</p>
+                                    <p>{viewStudent.section}</p>
+                                </div>
+                            </div>
+                            <div className="text-sm">
+                                <p className="font-medium text-muted-foreground">Address</p>
+                                <p>{viewStudent.address}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="font-medium text-muted-foreground">Guardian Name</p>
+                                    <p>{viewStudent.guardian_name}</p>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-muted-foreground">Guardian Contact</p>
+                                    <p>{viewStudent.guardian_contact_number}</p>
+                                </div>
+                            </div>
+                            {viewStudent.qr_code && (
+                                <div className="text-sm">
+                                    <p className="font-medium text-muted-foreground">QR Code</p>
+                                    <p className="font-mono text-xs">{viewStudent.qr_code}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setViewStudent(null)}>Close</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
