@@ -1,5 +1,4 @@
-import { Form, Head, usePage } from '@inertiajs/react';
-import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -16,6 +15,18 @@ type PageProps = {
 export default function Profile() {
     const { auth } = usePage<PageProps>().props;
 
+    const { data, setData, post, processing, errors } = useForm({
+        name: auth.user.name,
+        email: auth.user.email,
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        post('/settings/profile', {
+            preserveScroll: true,
+        });
+    };
+
     return (
         <>
             <Head title="Profile settings" />
@@ -29,65 +40,49 @@ export default function Profile() {
                     description="Update your name and email address"
                 />
 
-                <Form
-                    {...ProfileController.update.form()}
-                    options={{
-                        preserveScroll: true,
-                    }}
-                    className="space-y-6"
-                >
-                    {({ processing, errors }) => (
-                        <>
-                            <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="name">Name</Label>
 
-                                <Input
-                                    id="name"
-                                    className="mt-1 block w-full"
-                                    defaultValue={auth.user.name}
-                                    name="name"
-                                    required
-                                    autoComplete="name"
-                                    placeholder="Full name"
-                                />
+                        <Input
+                            id="name"
+                            className="mt-1 block w-full"
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
+                            required
+                            autoComplete="name"
+                            placeholder="Full name"
+                        />
 
-                                <InputError
-                                    className="mt-2"
-                                    message={errors.name}
-                                />
-                            </div>
+                        <InputError className="mt-2" message={errors.name} />
+                    </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                    <div className="grid gap-2">
+                        <Label htmlFor="email">Email address</Label>
 
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    className="mt-1 block w-full"
-                                    defaultValue={auth.user.email}
-                                    name="email"
-                                    required
-                                    autoComplete="username"
-                                    placeholder="Email address"
-                                />
+                        <Input
+                            id="email"
+                            type="email"
+                            className="mt-1 block w-full"
+                            value={data.email}
+                            onChange={(e) => setData('email', e.target.value)}
+                            required
+                            autoComplete="username"
+                            placeholder="Email address"
+                        />
 
-                                <InputError
-                                    className="mt-2"
-                                    message={errors.email}
-                                />
-                            </div>
+                        <InputError className="mt-2" message={errors.email} />
+                    </div>
 
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    disabled={processing}
-                                    data-test="update-profile-button"
-                                >
-                                    Save
-                                </Button>
-                            </div>
-                        </>
-                    )}
-                </Form>
+                    <div className="flex items-center gap-4">
+                        <Button
+                            disabled={processing}
+                            data-test="update-profile-button"
+                        >
+                            Save
+                        </Button>
+                    </div>
+                </form>
             </div>
 
             <DeleteUser />

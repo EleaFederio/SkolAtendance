@@ -1,10 +1,9 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid, Users } from 'lucide-react';
+import { LayoutGrid, Settings, Users } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
-import { TeamSwitcher } from '@/components/team-switcher';
 import {
     Sidebar,
     SidebarContent,
@@ -20,6 +19,8 @@ import type { NavItem } from '@/types';
 
 export function AppSidebar() {
     const page = usePage();
+    const user = page.props.auth?.user;
+    const isSuperUser = user?.role === 'super-user';
     const dashboardUrl = page.props.currentTeam
         ? dashboard(page.props.currentTeam.slug)
         : '/';
@@ -37,6 +38,14 @@ export function AppSidebar() {
         },
     ];
 
+    if (isSuperUser) {
+        mainNavItems.push({
+            title: 'Device Config',
+            href: page.props.currentTeam ? `/${page.props.currentTeam.slug}/device-config` : '/',
+            icon: Settings,
+        });
+    }
+
     const footerNavItems: NavItem[] = [];
 
     return (
@@ -49,11 +58,6 @@ export function AppSidebar() {
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <TeamSwitcher />
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>

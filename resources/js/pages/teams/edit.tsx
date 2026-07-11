@@ -1,4 +1,4 @@
-import { Form, Head, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { ChevronDown, Mail, UserPlus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import CancelInvitationModal from '@/components/cancel-invitation-modal';
@@ -42,6 +42,44 @@ type Props = {
     permissions: TeamPermissions;
     availableRoles: RoleOption[];
 };
+
+function TeamSettingsForm({ team }: { team: Team }) {
+    const { data, setData, post, processing, errors } = useForm({
+        name: team.name,
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        post(update.url(team.slug), { preserveScroll: true });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid gap-2">
+                <Label htmlFor="name">Team name</Label>
+                <Input
+                    id="name"
+                    name="name"
+                    data-test="team-name-input"
+                    value={data.name}
+                    onChange={(e) => setData('name', e.target.value)}
+                    required
+                />
+                <InputError message={errors.name} />
+            </div>
+
+            <div className="flex items-center gap-4">
+                <Button
+                    type="submit"
+                    data-test="team-save-button"
+                    disabled={processing}
+                >
+                    Save
+                </Button>
+            </div>
+        </form>
+    );
+}
 
 export default function TeamEdit({
     team,
@@ -104,38 +142,7 @@ export default function TeamEdit({
                                 description="Update your team name and settings"
                             />
 
-                            <Form
-                                {...update.form(team.slug)}
-                                className="space-y-6"
-                            >
-                                {({ errors, processing }) => (
-                                    <>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="name">
-                                                Team name
-                                            </Label>
-                                            <Input
-                                                id="name"
-                                                name="name"
-                                                data-test="team-name-input"
-                                                defaultValue={team.name}
-                                                required
-                                            />
-                                            <InputError message={errors.name} />
-                                        </div>
-
-                                        <div className="flex items-center gap-4">
-                                            <Button
-                                                type="submit"
-                                                data-test="team-save-button"
-                                                disabled={processing}
-                                            >
-                                                Save
-                                            </Button>
-                                        </div>
-                                    </>
-                                )}
-                            </Form>
+                            <TeamSettingsForm team={team} />
                         </>
                     ) : (
                         <>

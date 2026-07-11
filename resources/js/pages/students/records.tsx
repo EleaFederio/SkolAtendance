@@ -1,6 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { FileUp, Pencil, Plus, QrCode, Trash2, Upload } from 'lucide-react';
+import { useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +11,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -26,19 +32,28 @@ import type { Student } from '@/types';
 
 type Props = {
     students: Student[];
+    imported?: number;
+    import_errors?: string[];
 };
 
-export default function StudentRecords({ students }: Props) {
+export default function StudentRecords({ students, imported, import_errors }: Props) {
     const page = usePage();
+    const user = page.props.auth?.user;
+    const isSuperUser = user?.role === 'super-user';
     const [addOpen, setAddOpen] = useState(false);
     const [editStudent, setEditStudent] = useState<Student | null>(null);
     const [deleteStudent, setDeleteStudent] = useState<Student | null>(null);
+    const [qrStudent, setQrStudent] = useState<Student | null>(null);
+    const [importOpen, setImportOpen] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const teamSlug = page.props.currentTeam?.slug ?? '';
 
     const addForm = useForm({
         first_name: '',
         last_name: '',
+        picture: null as File | null,
         middle_initial: '',
         date_of_birth: '',
         gender: '',
@@ -53,6 +68,7 @@ export default function StudentRecords({ students }: Props) {
     const editForm = useForm({
         first_name: '',
         last_name: '',
+        picture: null as File | null,
         middle_initial: '',
         date_of_birth: '',
         gender: '',
@@ -64,6 +80,14 @@ export default function StudentRecords({ students }: Props) {
         guardian_contact_number: '',
     });
 
+    const qrForm = useForm({
+        qr_code: '',
+    });
+
+    const importForm = useForm({
+        csv_file: null as File | null,
+    });
+
     const handleAddOpen = () => {
         addForm.reset();
         setAddOpen(true);
@@ -73,6 +97,7 @@ export default function StudentRecords({ students }: Props) {
         editForm.setData({
             first_name: student.first_name,
             last_name: student.last_name,
+            picture: null,
             middle_initial: student.middle_initial ?? '',
             date_of_birth: student.date_of_birth,
             gender: student.gender,
@@ -86,9 +111,30 @@ export default function StudentRecords({ students }: Props) {
         setEditStudent(student);
     };
 
+    const handleQrOpen = (student: Student) => {
+        qrForm.setData({ qr_code: student.qr_code ?? '' });
+        setQrStudent(student);
+    };
+
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const formData = new FormData();
+        formData.append('first_name', addForm.data.first_name);
+        formData.append('last_name', addForm.data.last_name);
+        if (addForm.data.picture) {
+            formData.append('picture', addForm.data.picture);
+        }
+        formData.append('middle_initial', addForm.data.middle_initial);
+        formData.append('date_of_birth', addForm.data.date_of_birth);
+        formData.append('gender', addForm.data.gender);
+        formData.append('address', addForm.data.address);
+        formData.append('lrn', addForm.data.lrn);
+        formData.append('grade_level', addForm.data.grade_level);
+        formData.append('section', addForm.data.section);
+        formData.append('guardian_name', addForm.data.guardian_name);
+        formData.append('guardian_contact_number', addForm.data.guardian_contact_number);
         addForm.post(store.url({ current_team: teamSlug }), {
+            forceFormData: true,
             onSuccess: () => {
                 setAddOpen(false);
                 addForm.reset();
@@ -101,6 +147,7 @@ export default function StudentRecords({ students }: Props) {
         if (!editStudent) return;
         const url = `/${teamSlug}/students/${editStudent.id}/update`;
         editForm.post(url, {
+            forceFormData: true,
             onSuccess: () => {
                 setEditStudent(null);
                 editForm.reset();
@@ -115,16 +162,71 @@ export default function StudentRecords({ students }: Props) {
         });
     };
 
+    const handleQrSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!qrStudent) return;
+        const url = `/${teamSlug}/students/${qrStudent.id}/assign-qr`;
+        qrForm.post(url, {
+            onSuccess: () => {
+                setQrStudent(null);
+                qrForm.reset();
+            },
+        });
+    };
+
+    const handleImportSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!importForm.data.csv_file) return;
+        importForm.post(`/${teamSlug}/students/import`, {
+            onSuccess: () => {
+                setImportOpen(false);
+                importForm.reset();
+            },
+        });
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] ?? null;
+        importForm.setData('csv_file', file);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files?.[0] ?? null;
+        if (file && (file.name.endsWith('.csv') || file.name.endsWith('.txt'))) {
+            importForm.setData('csv_file', file);
+        }
+    };
+
     return (
         <>
             <Head title="Student Records" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-semibold">Student Records</h1>
-                    <Button onClick={handleAddOpen}>
-                        <Plus className="h-4 w-4" />
-                        Add Student
-                    </Button>
+                    {isSuperUser && (
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => setImportOpen(true)}>
+                                <FileUp className="h-4 w-4" />
+                                Import Students
+                            </Button>
+                            <Button onClick={handleAddOpen}>
+                                <Plus className="h-4 w-4" />
+                                Add Student
+                            </Button>
+                        </div>
+                    )}
                 </div>
                 <div className="relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
                     {students.length === 0 ? (
@@ -136,17 +238,33 @@ export default function StudentRecords({ students }: Props) {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-sidebar-border/70 dark:border-sidebar-border">
+                                        <th className="p-3 text-left font-medium">Picture</th>
                                         <th className="p-3 text-left font-medium">Name</th>
                                         <th className="p-3 text-left font-medium">LRN</th>
                                         <th className="p-3 text-left font-medium">Grade</th>
                                         <th className="p-3 text-left font-medium">Section</th>
                                         <th className="p-3 text-left font-medium">Guardian</th>
-                                        <th className="p-3 text-right font-medium">Actions</th>
+                                        <th className="p-3 text-right font-medium">
+                                            {isSuperUser ? 'Actions' : ''}
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {students.map((student) => (
                                         <tr key={student.id} className="border-b border-sidebar-border/70 dark:border-sidebar-border">
+                                            <td className="p-3">
+                                                {student.picture ? (
+                                                    <img
+                                                        src={`/storage/${student.picture}`}
+                                                        alt={`${student.first_name} ${student.last_name}`}
+                                                        className="h-16 w-16 rounded-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-sm font-medium">
+                                                        {student.first_name[0]}{student.last_name[0]}
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="p-3">
                                                 {student.last_name}, {student.first_name}
                                                 {student.middle_initial ? ` ${student.middle_initial}.` : ''}
@@ -156,22 +274,52 @@ export default function StudentRecords({ students }: Props) {
                                             <td className="p-3">{student.section}</td>
                                             <td className="p-3">{student.guardian_name}</td>
                                             <td className="p-3 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => handleEditOpen(student)}
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => setDeleteStudent(student)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </div>
+                                                {isSuperUser && (
+                                                    <div className="flex justify-end gap-2">
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => handleQrOpen(student)}
+                                                                    >
+                                                                        <QrCode className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>Assign QR Code</TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => handleEditOpen(student)}
+                                                                    >
+                                                                        <Pencil className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>Edit Student</TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => setDeleteStudent(student)}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>Delete Student</TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -191,6 +339,16 @@ export default function StudentRecords({ students }: Props) {
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleAddSubmit} className="space-y-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="picture">Picture (Optional)</Label>
+                            <Input
+                                id="picture"
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => addForm.setData('picture', e.target.files?.[0] ?? null)}
+                            />
+                            <InputError message={addForm.errors.picture} />
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="first_name">First Name</Label>
@@ -280,6 +438,26 @@ export default function StudentRecords({ students }: Props) {
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleEditSubmit} className="space-y-4">
+                        {editStudent?.picture && (
+                            <div className="grid gap-2">
+                                <Label>Current Picture</Label>
+                                <img
+                                    src={`/storage/${editStudent.picture}`}
+                                    alt={`${editStudent.first_name} ${editStudent.last_name}`}
+                                    className="h-20 w-20 rounded-full object-cover"
+                                />
+                            </div>
+                        )}
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit_picture">Picture (Optional)</Label>
+                            <Input
+                                id="edit_picture"
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => editForm.setData('picture', e.target.files?.[0] ?? null)}
+                            />
+                            <InputError message={editForm.errors.picture} />
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="edit_first_name">First Name</Label>
@@ -360,6 +538,34 @@ export default function StudentRecords({ students }: Props) {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={!!qrStudent} onOpenChange={() => setQrStudent(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Assign QR Code</DialogTitle>
+                        <DialogDescription>
+                            Enter the unique QR code for {qrStudent?.first_name} {qrStudent?.last_name}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleQrSubmit} className="space-y-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="qr_code">QR Code</Label>
+                            <Input
+                                id="qr_code"
+                                name="qr_code"
+                                value={qrForm.data.qr_code}
+                                onChange={(e) => qrForm.setData('qr_code', e.target.value)}
+                                placeholder="Enter unique QR code"
+                            />
+                            <InputError message={qrForm.errors.qr_code} />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" type="button" onClick={() => setQrStudent(null)}>Cancel</Button>
+                            <Button type="submit" disabled={qrForm.processing}>Save QR Code</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={!!deleteStudent} onOpenChange={() => setDeleteStudent(null)}>
                 <DialogContent>
                     <DialogHeader>
@@ -372,6 +578,90 @@ export default function StudentRecords({ students }: Props) {
                         <Button variant="outline" onClick={() => setDeleteStudent(null)}>Cancel</Button>
                         <Button variant="destructive" onClick={handleDelete}>Delete</Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={importOpen} onOpenChange={setImportOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Import Students</DialogTitle>
+                        <DialogDescription>
+                            Upload a CSV file to add multiple students at once.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleImportSubmit} className="space-y-4">
+                        <div className="grid gap-2">
+                            <Label>CSV File</Label>
+                            <div
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                onClick={() => fileInputRef.current?.click()}
+                                className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                                    isDragging
+                                        ? 'border-primary bg-primary/5'
+                                        : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                                }`}
+                            >
+                                <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
+                                {importForm.data.csv_file ? (
+                                    <p className="text-sm font-medium">{importForm.data.csv_file.name}</p>
+                                ) : (
+                                    <>
+                                        <p className="text-sm font-medium">Drop your CSV file here, or click to browse</p>
+                                        <p className="text-xs text-muted-foreground">.csv or .txt files only</p>
+                                    </>
+                                )}
+                            </div>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".csv,.txt"
+                                onChange={handleFileChange}
+                                className="hidden"
+                            />
+                            <InputError message={importForm.errors.csv_file} />
+                        </div>
+                        <div className="flex justify-end">
+                            <Button variant="outline" size="sm" type="button" onClick={() => {
+                                const headers = ['firstName','lastName','middleInitial','dateOfBirth','gender','address','lrn','gradeLevel','section','guardianName','guardianContactNumber'];
+                                const csv = headers.join(',') + '\n';
+                                const blob = new Blob([csv], { type: 'text/csv' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'student_import_template.csv';
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            }}>
+                                Download Template
+                            </Button>
+                        </div>
+                        {import_errors && import_errors.length > 0 && (
+                            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                                <p className="font-medium">Import completed with errors:</p>
+                                <ul className="mt-1 list-inside list-disc">
+                                    {import_errors.map((err, i) => (
+                                        <li key={i}>{err}</li>
+                                    ))}
+                                </ul>
+                                {imported !== undefined && imported > 0 && (
+                                    <p className="mt-1 font-medium">{imported} student(s) imported successfully.</p>
+                                )}
+                            </div>
+                        )}
+                        {imported !== undefined && imported > 0 && !import_errors?.length && (
+                            <div className="rounded-md bg-green-50 p-3 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                                {imported} student(s) imported successfully.
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button variant="outline" type="button" onClick={() => { setImportOpen(false); importForm.reset(); }}>Cancel</Button>
+                            <Button type="submit" disabled={!importForm.data.csv_file || importForm.processing}>
+                                {importForm.processing ? 'Importing...' : 'Import'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
                 </DialogContent>
             </Dialog>
         </>
