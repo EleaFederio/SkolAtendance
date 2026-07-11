@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutGrid, Settings, Users } from 'lucide-react';
+import { LayoutGrid, Monitor, Settings, Users } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -43,6 +43,11 @@ export function AppSidebar() {
             title: 'Device Config',
             href: page.props.currentTeam ? `/${page.props.currentTeam.slug}/device-config` : '/',
             icon: Settings,
+        });
+        mainNavItems.push({
+            title: 'Display Config',
+            href: page.props.currentTeam ? `/${page.props.currentTeam.slug}/display-config` : '/',
+            icon: Monitor,
         });
     }
 

@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { FileUp, Eye, Pencil, Plus, QrCode, Trash2, Upload } from 'lucide-react';
+import { FileUp, Eye, LayoutGrid, List, Pencil, Plus, QrCode, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,7 @@ export default function StudentRecords({ students, imported, import_errors }: Pr
     const [deleteStudent, setDeleteStudent] = useState<Student | null>(null);
     const [qrStudent, setQrStudent] = useState<Student | null>(null);
     const [importOpen, setImportOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -217,25 +218,47 @@ export default function StudentRecords({ students, imported, import_errors }: Pr
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-semibold">Student Records</h1>
-                    {isSuperUser && (
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => setImportOpen(true)}>
-                                <FileUp className="h-4 w-4" />
-                                Import Students
-                            </Button>
-                            <Button onClick={handleAddOpen}>
-                                <Plus className="h-4 w-4" />
-                                Add Student
-                            </Button>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {students.length > 0 && (
+                            <div className="flex items-center rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
+                                <Button
+                                    variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                                    size="icon"
+                                    className="h-8 w-8 rounded-r-none"
+                                    onClick={() => setViewMode('list')}
+                                >
+                                    <List className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+                                    size="icon"
+                                    className="h-8 w-8 rounded-l-none"
+                                    onClick={() => setViewMode('cards')}
+                                >
+                                    <LayoutGrid className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        )}
+                        {isSuperUser && (
+                            <>
+                                <Button variant="outline" onClick={() => setImportOpen(true)}>
+                                    <FileUp className="h-4 w-4" />
+                                    Import Students
+                                </Button>
+                                <Button onClick={handleAddOpen}>
+                                    <Plus className="h-4 w-4" />
+                                    Add Student
+                                </Button>
+                            </>
+                        )}
+                    </div>
                 </div>
                 <div className="relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
                     {students.length === 0 ? (
                         <div className="flex h-full items-center justify-center p-8 text-muted-foreground">
                             No student records found.
                         </div>
-                    ) : (
+                    ) : viewMode === 'list' ? (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
@@ -341,6 +364,51 @@ export default function StudentRecords({ students, imported, import_errors }: Pr
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                            {students.map((student) => (
+                                <div
+                                    key={student.id}
+                                    className="flex flex-col items-center rounded-lg border border-sidebar-border/70 p-4 text-center transition-colors hover:bg-muted/50 dark:border-sidebar-border"
+                                >
+                                    {student.picture ? (
+                                        <img
+                                            src={`/storage/${student.picture}`}
+                                            alt={`${student.first_name} ${student.last_name}`}
+                                            className="mb-3 h-20 w-20 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-muted text-xl font-medium">
+                                            {student.first_name[0]}{student.last_name[0]}
+                                        </div>
+                                    )}
+                                    <p className="font-medium leading-tight">
+                                        {student.last_name}, {student.first_name}
+                                        {student.middle_initial ? ` ${student.middle_initial}.` : ''}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">LRN: {student.lrn}</p>
+                                    <p className="text-xs text-muted-foreground">{student.grade_level} - {student.section}</p>
+                                    <div className="mt-3 flex gap-1">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewStudent(student)}>
+                                            <Eye className="h-3.5 w-3.5" />
+                                        </Button>
+                                        {isSuperUser && (
+                                            <>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleQrOpen(student)}>
+                                                    <QrCode className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditOpen(student)}>
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDeleteStudent(student)}>
+                                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>

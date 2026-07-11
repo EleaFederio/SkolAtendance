@@ -10,6 +10,16 @@ use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
 
+Route::get('monitor-display', [\App\Http\Controllers\MonitorController::class, 'index'])->name('monitor-display');
+Route::get('api/monitor/recent', [\App\Http\Controllers\MonitorController::class, 'recentEntries'])->name('monitor.recent');
+Route::get('api/monitor/stats', [\App\Http\Controllers\MonitorController::class, 'stats'])->name('monitor.stats');
+Route::get('api/monitor/onsite', [\App\Http\Controllers\MonitorController::class, 'onsiteStudents'])->name('monitor.onsite');
+Route::post('api/monitor/check-in', [\App\Http\Controllers\MonitorController::class, 'checkIn'])->name('monitor.checkIn');
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('scan-attendance', [\App\Http\Controllers\MonitorController::class, 'scan'])->name('scan-attendance');
+});
+
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
     ->group(function () {
@@ -30,6 +40,8 @@ Route::prefix('{current_team}')
         // Device Config - super-user only
         Route::middleware(EnsureRole::class . ':' . Role::SUPER_USER->value)->group(function () {
             Route::get('device-config', fn () => \Inertia\Inertia::render('device-config/index'))->name('device-config');
+            Route::get('display-config', [\App\Http\Controllers\DisplayConfigController::class, 'index'])->name('display-config');
+            Route::post('display-config', [\App\Http\Controllers\DisplayConfigController::class, 'save'])->name('display-config.save');
         });
     });
 
