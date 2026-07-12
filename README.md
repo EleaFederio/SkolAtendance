@@ -2,6 +2,12 @@
 
 A student attendance monitoring system for CFNHS (Calabarzon Faith National High School) built with Laravel 13, React 19, Inertia.js, and Tailwind CSS.
 
+## Purpose
+
+This system was developed in response to the successive incidents of violence in schools during the second quarter of 2026, including the school shooting incident in Tacloban and other similar events across the country. These tragic incidents highlighted the urgent need for better school security measures and real-time communication between schools and parents.
+
+This system enhances school security by using QR code-based attendance tracking. It ensures that every student entering and leaving the school premises is properly recorded. Parents and guardians receive **instant SMS notifications** whenever their son or daughter enters or exits the school, providing real-time visibility into their child's safety and whereabouts. This helps prevent unauthorized departures and gives parents peace of mind knowing when their child arrives at and leaves school.
+
 ## Features
 
 - **Student Records CRUD** — Add, edit, delete, view students with profile pictures
@@ -13,6 +19,8 @@ A student attendance monitoring system for CFNHS (Calabarzon Faith National High
 - **Dashboard** — Overview with on-site students table and live stats
 - **Role-Based Access** — Super-user (full access) and Teacher (view-only)
 - **Display Config** — Customize monitor display settings (welcome message, clock, stats, media, refresh interval)
+- **SMS Gateway** — Send real-time attendance notifications to guardians via HTTPSMS or SMSGate
+- **Custom SMS Templates** — Personalize notification messages with placeholders (greeting, student name, guardian name, time, grade, section)
 
 ## Requirements
 
@@ -165,12 +173,16 @@ In Android Studio:
 │   │   │   ├── DashboardController.php   # Dashboard with stats
 │   │   │   ├── DisplayConfigController.php # Display settings
 │   │   │   ├── MonitorController.php     # Monitor display, scan, check-in API
+│   │   │   ├── SmsConfigController.php   # SMS gateway configuration
 │   │   │   └── StudentController.php     # Student CRUD, import, QR assign
 │   │   └── Middleware/EnsureRole.php      # Role-based access control
-│   └── Models/
-│       ├── Attendance.php                 # Attendance records
-│       ├── DisplaySetting.php             # Display configuration
-│       └── Student.php                    # Student model
+│   ├── Models/
+│   │   ├── Attendance.php                 # Attendance records
+│   │   ├── DisplaySetting.php             # Display configuration
+│   │   ├── SmsLog.php                     # SMS notification logs
+│   │   └── Student.php                    # Student model
+│   └── Services/
+│       └── SmsService.php                 # SMS gateway (HTTPSMS/SMSGate)
 ├── database/migrations/                   # Database migrations
 ├── resources/js/
 │   ├── pages/
@@ -179,6 +191,7 @@ In Android Studio:
 │   │   ├── device-config/index.tsx        # Device config (phone scan + USB scanner)
 │   │   ├── monitor-display.tsx            # Public monitor display
 │   │   ├── scan-attendance.tsx            # Mobile QR scanner page
+│   │   ├── sms-config/index.tsx           # SMS gateway configuration
 │   │   └── students/records.tsx           # Student records management
 │   └── components/                        # Reusable UI components
 └── routes/web.php                         # Application routes
@@ -193,6 +206,7 @@ In Android Studio:
 | `/{team}/students/records` | Student records | Yes |
 | `/{team}/device-config` | Device configuration | Yes (super-user) |
 | `/{team}/display-config` | Display settings | Yes (super-user) |
+| `/{team}/sms-config` | SMS gateway configuration | Yes (super-user) |
 | `/monitor-display` | Public monitor display | No |
 | `/scan-attendance` | Mobile QR scanner | Yes |
 | `/api/monitor/check-in` | Scan QR code API | No |
