@@ -27,6 +27,7 @@ class DisplayConfigController extends Controller
             'clock_enabled' => 'required|boolean',
             'stats_enabled' => 'required|boolean',
             'media_enabled' => 'required|boolean',
+            'auto_switch_attendance' => 'required|boolean',
             'refresh_interval' => 'required|integer|min:1|max:60',
             'media' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4,mov,avi,webm|max:51200',
         ]);

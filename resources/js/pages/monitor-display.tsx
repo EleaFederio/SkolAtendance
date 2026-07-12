@@ -7,6 +7,21 @@ type Stats = {
     absent: number;
 };
 
+type Entry = {
+    id: number;
+    type: 'in' | 'out';
+    scanned_at: string;
+    student: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        middle_initial: string | null;
+        grade_level: string;
+        section: string;
+        picture: string | null;
+    };
+};
+
 type Settings = {
     welcome_enabled: boolean;
     welcome_message: string;
@@ -16,6 +31,7 @@ type Settings = {
     media_type: string | null;
     media_enabled: boolean;
     refresh_interval: number;
+    auto_switch_attendance: boolean;
 };
 
 type Props = {
@@ -27,12 +43,35 @@ export default function MonitorDisplay({ settings }: Props) {
     const [muted, setMuted] = useState(true);
     const [stats, setStats] = useState<Stats>({ total_students: 0, entered: 0, absent: 0 });
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [toasts, setToasts] = useState<Entry[]>([]);
+    const [scanToast, setScanToast] = useState<Entry | null>(null);
+    const seenIdsRef = useRef<Set<number>>(new Set());
+    const initializedRef = useRef(false);
+    const bufferRef = useRef('');
 
     const fetchData = async () => {
         try {
-            const statsRes = await fetch('/api/monitor/stats');
+            const [statsRes, entriesRes] = await Promise.all([
+                fetch('/api/monitor/stats'),
+                fetch('/api/monitor/recent'),
+            ]);
             const statsData = await statsRes.json();
+            const entriesData = await entriesRes.json();
             setStats(statsData);
+
+            if (!initializedRef.current) {
+                entriesData.forEach((e: Entry) => seenIdsRef.current.add(e.id));
+                initializedRef.current = true;
+                return;
+            }
+
+            if (!settings.auto_switch_attendance) {
+                const newEntries: Entry[] = entriesData.filter((e: Entry) => !seenIdsRef.current.has(e.id));
+                if (newEntries.length > 0) {
+                    newEntries.forEach((e) => seenIdsRef.current.add(e.id));
+                    setToasts((prev) => [...newEntries.reverse(), ...prev].slice(0, 5));
+                }
+            }
         } catch {
             // silently fail
         }
@@ -49,7 +88,59 @@ export default function MonitorDisplay({ settings }: Props) {
         return () => clearInterval(timer);
     }, []);
 
+    useEffect(() => {
+        if (!settings.auto_switch_attendance) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                const code = bufferRef.current.trim();
+                bufferRef.current = '';
+                if (code) handleUsbScan(code);
+            } else if (e.key.length === 1) {
+                bufferRef.current += e.key;
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [settings.auto_switch_attendance]);
+
+    const handleUsbScan = async (qrCode: string) => {
+        try {
+            const res = await fetch('/api/monitor/check-in', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ qr_code: qrCode }),
+            });
+            const data = await res.json();
+            if (!res.ok) return;
+
+            setScanToast({
+                id: data.attendance.id,
+                type: data.attendance.type,
+                scanned_at: data.attendance.scanned_at,
+                student: data.student,
+            });
+            setTimeout(() => setScanToast(null), 5000);
+        } catch {
+            // silently fail
+        }
+    };
+
+    useEffect(() => {
+        if (toasts.length === 0) return;
+        const timer = setTimeout(() => {
+            setToasts((prev) => prev.slice(0, -1));
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [toasts]);
+
+    const removeToast = (id: number) => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+    };
+
     const mediaUrl = settings.media_path ? `/storage/${settings.media_path}` : null;
+    const getInitials = (first: string, last: string) => `${first[0]}${last[0]}`;
 
     return (
         <>
@@ -97,7 +188,7 @@ export default function MonitorDisplay({ settings }: Props) {
                         </div>
                     )}
 
-                    {settings.media_enabled && mediaUrl && (
+                    {settings.media_enabled && mediaUrl && !scanToast && (
                         <div className="relative mb-6 flex justify-center">
                             {settings.media_type === 'video' ? (
                                 <>
@@ -139,9 +230,86 @@ export default function MonitorDisplay({ settings }: Props) {
                             )}
                         </div>
                     )}
-
-
                 </main>
+
+                {scanToast && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+                        <div className={`flex h-[80vh] w-[80vw] flex-col items-center justify-center gap-8 rounded-3xl shadow-2xl ${
+                            scanToast.type === 'in' ? 'bg-green-600' : 'bg-orange-600'
+                        }`}>
+                            {scanToast.student.picture ? (
+                                <img
+                                    src={`/storage/${scanToast.student.picture}`}
+                                    alt={scanToast.student.last_name}
+                                    className="h-40 w-40 rounded-full border-4 border-white/30 object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-40 w-40 items-center justify-center rounded-full border-4 border-white/30 bg-white/20 text-5xl font-bold text-white">
+                                    {getInitials(scanToast.student.first_name, scanToast.student.last_name)}
+                                </div>
+                            )}
+                            <div className="text-center text-white">
+                                <p className="text-5xl font-bold">
+                                    {scanToast.student.last_name}, {scanToast.student.first_name}
+                                </p>
+                                <p className="mt-2 text-2xl opacity-80">
+                                    {scanToast.student.grade_level} - {scanToast.student.section}
+                                </p>
+                            </div>
+                            <span className="rounded-full bg-white/20 px-8 py-3 text-4xl font-bold uppercase text-white">
+                                {scanToast.type === 'in' ? '✓ ATTEND' : '✗ LEAVE'}
+                            </span>
+                            <div className="text-center text-lg text-white opacity-70">
+                                <p>{new Date(scanToast.scanned_at).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                <p>{new Date(scanToast.scanned_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="fixed right-6 bottom-6 z-50 flex w-[35vw] flex-col gap-3">
+                    {toasts.map((toast) => {
+                        const scannedDate = new Date(toast.scanned_at);
+                        return (
+                            <div
+                                key={toast.id}
+                                onClick={() => removeToast(toast.id)}
+                                className={`flex h-[40vh] flex-col items-center justify-center gap-5 rounded-2xl px-8 py-6 shadow-2xl transition-all duration-300 ${
+                                    toast.type === 'in'
+                                        ? 'bg-green-600 text-white'
+                                        : 'bg-orange-600 text-white'
+                                }`}
+                            >
+                                {toast.student.picture ? (
+                                    <img
+                                        src={`/storage/${toast.student.picture}`}
+                                        alt={toast.student.last_name}
+                                        className="h-28 w-28 rounded-full border-2 border-white/30 object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-white/30 bg-white/20 text-4xl font-bold">
+                                        {getInitials(toast.student.first_name, toast.student.last_name)}
+                                    </div>
+                                )}
+                                <div className="text-center">
+                                    <p className="text-3xl font-bold">
+                                        {toast.student.last_name}, {toast.student.first_name}
+                                    </p>
+                                    <p className="mt-1 text-lg opacity-80">
+                                        {toast.student.grade_level} - {toast.student.section}
+                                    </p>
+                                </div>
+                                <span className="rounded-full bg-white/20 px-6 py-2 text-3xl font-bold uppercase">
+                                    {toast.type === 'in' ? '✓ IN' : '✗ OUT'}
+                                </span>
+                                <div className="text-center text-sm opacity-70">
+                                    <p>{scannedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                    <p>{scannedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </>
     );

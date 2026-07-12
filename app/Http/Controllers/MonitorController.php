@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\DisplaySetting;
 use App\Models\Student;
+use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,6 +13,10 @@ use Inertia\Response;
 
 class MonitorController extends Controller
 {
+    public function __construct(private SmsService $smsService)
+    {
+    }
+
     public function index(): Response
     {
         $settings = DisplaySetting::getOrCreate();
@@ -26,6 +31,7 @@ class MonitorController extends Controller
                 'media_type' => $settings->media_type,
                 'media_enabled' => $settings->media_enabled,
                 'refresh_interval' => $settings->refresh_interval,
+                'auto_switch_attendance' => $settings->auto_switch_attendance,
             ],
         ]);
     }
@@ -65,10 +71,13 @@ class MonitorController extends Controller
         $today = now()->startOfDay();
 
         $totalStudents = Student::count();
-        $entered = Attendance::where('type', 'in')
-            ->where('scanned_at', '>=', $today)
-            ->distinct('student_id')
-            ->count('student_id');
+        $entered = Student::whereIn('id', function ($query) use ($today) {
+            $query->select('student_id')
+                ->from('attendances')
+                ->where('scanned_at', '>=', $today)
+                ->groupBy('student_id')
+                ->havingRaw('COUNT(*) % 2 = 1');
+        })->count();
         $absent = $totalStudents - $entered;
 
         return response()->json([
@@ -85,16 +94,15 @@ class MonitorController extends Controller
         $students = Student::whereIn('id', function ($query) use ($today) {
             $query->select('student_id')
                 ->from('attendances')
-                ->where('type', 'in')
                 ->where('scanned_at', '>=', $today)
                 ->groupBy('student_id')
                 ->havingRaw('COUNT(*) % 2 = 1');
         })
         ->get()
-        ->map(function ($student) {
+        ->map(function ($student) use ($today) {
             $lastIn = Attendance::where('student_id', $student->id)
                 ->where('type', 'in')
-                ->where('scanned_at', '>=', now()->startOfDay())
+                ->where('scanned_at', '>=', $today)
                 ->latest('scanned_at')
                 ->first();
 
@@ -117,6 +125,7 @@ class MonitorController extends Controller
     {
         $request->validate([
             'qr_code' => 'required|string',
+            'type' => 'sometimes|in:in,out',
         ]);
 
         $student = Student::where('qr_code', $request->qr_code)->first();
@@ -125,18 +134,24 @@ class MonitorController extends Controller
             return response()->json(['error' => 'Invalid QR code'], 404);
         }
 
-        $lastAttendance = Attendance::where('student_id', $student->id)
-            ->where('scanned_at', '>=', now()->startOfDay())
-            ->latest('scanned_at')
-            ->first();
+        if ($request->has('type')) {
+            $type = $request->type;
+        } else {
+            $lastAttendance = Attendance::where('student_id', $student->id)
+                ->where('scanned_at', '>=', now()->startOfDay())
+                ->latest('scanned_at')
+                ->first();
 
-        $type = ($lastAttendance && $lastAttendance->type === 'in') ? 'out' : 'in';
+            $type = ($lastAttendance && $lastAttendance->type === 'in') ? 'out' : 'in';
+        }
 
         $attendance = Attendance::create([
             'student_id' => $student->id,
             'type' => $type,
             'scanned_at' => now(),
         ]);
+
+        $this->sendGuardianSms($student, $type);
 
         return response()->json([
             'attendance' => [
@@ -154,5 +169,52 @@ class MonitorController extends Controller
                 'picture' => $student->picture,
             ],
         ]);
+    }
+
+    private function sendGuardianSms(Student $student, string $type): void
+    {
+        if (empty($student->guardian_contact_number)) {
+            return;
+        }
+
+        $settings = \Illuminate\Support\Facades\Storage::exists('sms-settings.json')
+            ? json_decode(\Illuminate\Support\Facades\Storage::get('sms-settings.json'), true)
+            : [];
+
+        $template = $type === 'in'
+            ? ($settings['message_attended'] ?? 'CFNHS: {student_name} has arrived at school at {time}. Grade {grade} - {section}.')
+            : ($settings['message_left'] ?? 'CFNHS: {student_name} has left school at {time}. Grade {grade} - {section}.');
+
+        $time = now()->format('M d, Y h:i A');
+        $hour = (int) now()->format('H');
+
+        if ($hour < 12) {
+            $greeting = 'Good morning';
+        } elseif ($hour < 17) {
+            $greeting = 'Good afternoon';
+        } else {
+            $greeting = 'Good evening';
+        }
+
+        $message = str_replace(
+            ['{student_name}', '{guardian_name}', '{greeting}', '{time}', '{grade}', '{section}', '{school_name}'],
+            [
+                $student->first_name . ' ' . $student->last_name,
+                $student->guardian_name ?? '',
+                $greeting,
+                $time,
+                $student->grade_level,
+                $student->section,
+                'CFNHS',
+            ],
+            $template
+        );
+
+        $this->smsService->send(
+            $student->guardian_contact_number,
+            $message,
+            $student->id,
+            $type
+        );
     }
 }

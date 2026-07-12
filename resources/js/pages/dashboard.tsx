@@ -34,6 +34,7 @@ export default function Dashboard({ pendingInvitations = [], totalStudents = 0 }
     );
     const [stats, setStats] = useState<Stats>({ total_students: totalStudents, entered: 0, absent: 0 });
     const [onsiteStudents, setOnsiteStudents] = useState<OnsiteStudent[]>([]);
+    const [search, setSearch] = useState('');
 
     const fetchData = async () => {
         try {
@@ -58,6 +59,14 @@ export default function Dashboard({ pendingInvitations = [], totalStudents = 0 }
 
     const formatTime = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const getInitials = (first: string, last: string) => `${first[0]}${last[0]}`;
+
+    const filteredStudents = onsiteStudents.filter((s) => {
+        const q = search.toLowerCase();
+        if (!q) return true;
+        const fullName = `${s.last_name} ${s.first_name} ${s.middle_initial || ''}`.toLowerCase();
+        const gradeSection = `${s.grade_level} ${s.section}`.toLowerCase();
+        return fullName.includes(q) || gradeSection.includes(q);
+    });
 
     return (
         <>
@@ -106,11 +115,22 @@ export default function Dashboard({ pendingInvitations = [], totalStudents = 0 }
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-lg font-semibold">On-Site Students ({onsiteStudents.length})</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg font-semibold">On-Site Students ({onsiteStudents.length})</CardTitle>
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search by name or grade..."
+                                className="w-64 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                            />
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {onsiteStudents.length === 0 ? (
                             <p className="py-8 text-center text-sm text-muted-foreground">No students on-site yet today.</p>
+                        ) : filteredStudents.length === 0 ? (
+                            <p className="py-8 text-center text-sm text-muted-foreground">No students match "{search}".</p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
@@ -122,7 +142,7 @@ export default function Dashboard({ pendingInvitations = [], totalStudents = 0 }
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {onsiteStudents.map((student) => (
+                                        {filteredStudents.map((student) => (
                                             <tr key={student.id} className="border-b last:border-0">
                                                 <td className="flex items-center gap-3 py-3 pr-4">
                                                     {student.picture ? (

@@ -2,6 +2,8 @@ import { Head } from '@inertiajs/react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useEffect, useRef, useState } from 'react';
 
+const API_URL_KEY = 'cfnhs_server_url';
+
 type ScanResult = {
     student: {
         id: number;
@@ -24,11 +26,28 @@ type Feedback = {
     timestamp: number;
 };
 
+function getApiBase(): string {
+    const saved = localStorage.getItem(API_URL_KEY);
+    if (saved) return saved.replace(/\/+$/, '');
+    return '';
+}
+
+function getPictureUrl(path: string | null): string {
+    if (!path) return '';
+    const base = getApiBase();
+    if (path.startsWith('http')) return path;
+    return `${base}/storage/${path}`;
+}
+
 export default function ScanAttendance() {
+    const [serverUrl, setServerUrl] = useState(() => localStorage.getItem(API_URL_KEY) || '');
+    const [showSettings, setShowSettings] = useState(() => !localStorage.getItem(API_URL_KEY));
+    const [tempUrl, setTempUrl] = useState(serverUrl);
     const [scanning, setScanning] = useState(false);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [cameraReady, setCameraReady] = useState(false);
+    const [scanCount, setScanCount] = useState(0);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +58,15 @@ export default function ScanAttendance() {
             }
         };
     }, []);
+
+    const saveServerUrl = () => {
+        let url = tempUrl.trim().replace(/\/+$/, '');
+        if (!url) return;
+        if (!url.startsWith('http')) url = 'http://' + url;
+        localStorage.setItem(API_URL_KEY, url);
+        setServerUrl(url);
+        setShowSettings(false);
+    };
 
     const startScanner = async () => {
         if (!containerRef.current) return;
@@ -77,7 +105,7 @@ export default function ScanAttendance() {
             if (message.includes('NotAllowedError') || message.includes('Permission')) {
                 setError('Camera permission denied. Please allow camera access and try again.');
             } else {
-                setError('Unable to start camera. Make sure you are using HTTPS or localhost.');
+                setError('Unable to start camera: ' + message);
             }
             setScanning(false);
         }
@@ -94,8 +122,14 @@ export default function ScanAttendance() {
     };
 
     const handleScan = async (qrCode: string) => {
+        const apiBase = getApiBase();
+        if (!apiBase) {
+            setError('Server URL not configured');
+            return;
+        }
+
         try {
-            const res = await fetch('/api/monitor/check-in', {
+            const res = await fetch(`${apiBase}/api/monitor/check-in`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ qr_code: qrCode }),
@@ -111,6 +145,7 @@ export default function ScanAttendance() {
             }
 
             setFeedback({ result: data, timestamp: Date.now() });
+            setScanCount((c) => c + 1);
             setError(null);
             setTimeout(() => setFeedback(null), 4000);
         } catch {
@@ -123,23 +158,68 @@ export default function ScanAttendance() {
     const getInitials = (first: string, last: string) => `${first[0]}${last[0]}`;
     const formatTime = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+    if (showSettings) {
+        return (
+            <>
+                <Head title="CFNHS Scanner" />
+                <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6 text-white">
+                    <div className="flex w-full max-w-sm flex-col items-center gap-6">
+                        <img src="/images/school_logo.png" alt="CFNHS" className="h-20 w-auto" />
+                        <h1 className="text-xl font-bold">CFNHS Scanner</h1>
+                        <p className="text-center text-sm text-gray-400">Enter your server address to connect</p>
+                        <input
+                            type="text"
+                            value={tempUrl}
+                            onChange={(e) => setTempUrl(e.target.value)}
+                            placeholder="http://192.168.0.101:8000"
+                            className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-center text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                            onKeyDown={(e) => e.key === 'Enter' && saveServerUrl()}
+                        />
+                        <button
+                            onClick={saveServerUrl}
+                            className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold transition hover:bg-blue-700 active:scale-95"
+                        >
+                            Connect
+                        </button>
+                    </div>
+                </div>
+            </>
+        );
+    }
+
     return (
         <>
-            <Head title="Scan Attendance" />
+            <Head title="CFNHS Scanner" />
             <div className="flex min-h-screen flex-col items-center bg-gray-950 text-white">
                 <header className="flex w-full items-center justify-between bg-gray-900 px-4 py-3">
                     <div className="flex items-center gap-3">
                         <img src="/images/school_logo.png" alt="CFNHS" className="h-8 w-auto" />
-                        <h1 className="text-sm font-bold">Scan Attendance</h1>
+                        <div>
+                            <h1 className="text-sm font-bold">CFNHS Scanner</h1>
+                            <p className="text-[10px] text-gray-500">{serverUrl}</p>
+                        </div>
                     </div>
-                    {scanning && (
+                    <div className="flex items-center gap-2">
+                        {scanCount > 0 && (
+                            <span className="rounded-full bg-green-600/20 px-2 py-0.5 text-[10px] font-semibold text-green-400">
+                                {scanCount} scanned
+                            </span>
+                        )}
                         <button
-                            onClick={stopScanner}
-                            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold transition hover:bg-red-700"
+                            onClick={() => { stopScanner(); setShowSettings(true); }}
+                            className="rounded-lg bg-gray-700 px-2.5 py-1.5 text-[10px] font-semibold transition hover:bg-gray-600"
                         >
-                            Stop
+                            Settings
                         </button>
-                    )}
+                        {scanning && (
+                            <button
+                                onClick={stopScanner}
+                                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold transition hover:bg-red-700"
+                            >
+                                Stop
+                            </button>
+                        )}
+                    </div>
                 </header>
 
                 <main className="flex flex-1 flex-col items-center justify-center p-4">
@@ -158,7 +238,7 @@ export default function ScanAttendance() {
                             </div>
                             <div className="text-center">
                                 <p className="text-lg font-semibold">Ready to Scan</p>
-                                <p className="mt-1 text-sm text-gray-400">Tap the button below to start scanning QR codes</p>
+                                <p className="mt-1 text-sm text-gray-400">Tap the button to start scanning QR codes</p>
                             </div>
                             <button
                                 onClick={startScanner}
@@ -191,7 +271,7 @@ export default function ScanAttendance() {
                             }`}>
                                 {feedback.result.student.picture ? (
                                     <img
-                                        src={`/storage/${feedback.result.student.picture}`}
+                                        src={getPictureUrl(feedback.result.student.picture)}
                                         alt={feedback.result.student.last_name}
                                         className="h-14 w-14 rounded-full border-2 border-white/30 object-cover"
                                     />

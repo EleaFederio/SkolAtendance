@@ -22,6 +22,7 @@ type Settings = {
     media_type: string | null;
     media_enabled: boolean;
     refresh_interval: number;
+    auto_switch_attendance: boolean;
 };
 
 type Props = {
@@ -38,6 +39,7 @@ export default function DisplayConfig({ settings }: Props) {
         clock_enabled: settings.clock_enabled,
         stats_enabled: settings.stats_enabled,
         media_enabled: settings.media_enabled,
+        auto_switch_attendance: settings.auto_switch_attendance,
         refresh_interval: settings.refresh_interval,
         media: null as File | null,
     });
@@ -189,6 +191,26 @@ export default function DisplayConfig({ settings }: Props) {
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.refresh_interval} />
+                        </div>
+
+                        <div className="space-y-4 rounded-lg border p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-medium">Auto Switch Attendance Mode</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        When enabled, the display shows media. When a QR code is scanned, media hides and a large toast shows the student details.
+                                    </p>
+                                </div>
+                                <label className="relative inline-flex cursor-pointer items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.auto_switch_attendance}
+                                        onChange={(e) => setData('auto_switch_attendance', e.target.checked)}
+                                        className="peer sr-only"
+                                    />
+                                    <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-700" />
+                                </label>
+                            </div>
                         </div>
 
                         <div className="flex items-center gap-4">

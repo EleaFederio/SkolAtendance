@@ -15,6 +15,7 @@ class DisplaySetting extends Model
         'media_type',
         'media_enabled',
         'refresh_interval',
+        'auto_switch_attendance',
     ];
 
     protected $casts = [
@@ -23,6 +24,7 @@ class DisplaySetting extends Model
         'stats_enabled' => 'boolean',
         'media_enabled' => 'boolean',
         'refresh_interval' => 'integer',
+        'auto_switch_attendance' => 'boolean',
     ];
 
     public static function getOrCreate(): self

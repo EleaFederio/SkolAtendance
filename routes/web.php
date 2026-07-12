@@ -42,6 +42,9 @@ Route::prefix('{current_team}')
             Route::get('device-config', fn () => \Inertia\Inertia::render('device-config/index'))->name('device-config');
             Route::get('display-config', [\App\Http\Controllers\DisplayConfigController::class, 'index'])->name('display-config');
             Route::post('display-config', [\App\Http\Controllers\DisplayConfigController::class, 'save'])->name('display-config.save');
+            Route::get('sms-config', [\App\Http\Controllers\SmsConfigController::class, 'index'])->name('sms-config');
+            Route::post('sms-config', [\App\Http\Controllers\SmsConfigController::class, 'save'])->name('sms-config.save');
+            Route::post('sms-config/test', [\App\Http\Controllers\SmsConfigController::class, 'test'])->name('sms-config.test');
         });
     });
 

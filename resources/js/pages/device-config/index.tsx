@@ -17,7 +17,6 @@ type ScanFeedback = {
 };
 
 export default function DeviceConfig() {
-    const scanUrl = `${window.location.origin}/scan-attendance`;
     const [scannerEnabled, setScannerEnabled] = useState(false);
     const [feedback, setFeedback] = useState<ScanFeedback | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -79,36 +78,11 @@ export default function DeviceConfig() {
 
     return (
         <>
-            <Head title="Device Config" />
+            <Head title="QR Code Attendance" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-                <h1 className="text-2xl font-semibold">Device Configuration</h1>
+                <h1 className="text-2xl font-semibold">QR Code Attendance</h1>
                 <div className="relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
                     <div className="flex h-full flex-col items-center justify-center gap-8 p-8">
-                        <div className="flex flex-col items-center gap-3">
-                            <a
-                                href={scanUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 active:scale-95"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-                                    <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-                                    <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-                                    <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-                                    <line x1="7" y1="12" x2="17" y2="12" />
-                                    <line x1="7" y1="8" x2="17" y2="8" />
-                                    <line x1="7" y1="16" x2="17" y2="16" />
-                                </svg>
-                                Scan via Phone
-                            </a>
-                            <p className="max-w-xs text-center text-xs text-muted-foreground">
-                                Open this page on your phone to start scanning student QR codes.
-                            </p>
-                        </div>
-
-                        <div className="h-px w-full max-w-sm bg-border" />
-
                         <div className="flex flex-col items-center gap-4">
                             <div className="flex items-center gap-3">
                                 <label className="text-sm font-medium">USB QR Scanner</label>
@@ -201,6 +175,6 @@ export default function DeviceConfig() {
 DeviceConfig.layout = (props: { currentTeam?: { slug: string } | null }) => ({
     breadcrumbs: [
         { title: 'Dashboard', href: props.currentTeam ? `/dashboard` : '/' },
-        { title: 'Device Config', href: '#' },
+        { title: 'QR Code Attendance', href: '#' },
     ],
 });
