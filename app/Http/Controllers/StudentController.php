@@ -73,6 +73,8 @@ class StudentController extends Controller
                 Storage::disk('public')->delete($student->picture);
             }
             $validated['picture'] = $request->file('picture')->store('students', 'public');
+        } else {
+            unset($validated['picture']);
         }
 
         $student->update($validated);
